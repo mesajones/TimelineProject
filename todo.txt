@@ -1,0 +1,6 @@
+TODO:
+
+    -   28/12/23 ; 10:30pm:
+        Finish EOS cue list populate function. consider how to fix
+        issue of having part cues and whether to treat them as part
+        of the cue or not.

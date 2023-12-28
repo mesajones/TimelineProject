@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 
 from utils import timecode_to_float, float_to_timecode, parse_json
 from config.settings import TIMECODE_FPS
@@ -83,7 +83,7 @@ class EOSCueList:
         cue_list (List[EOSCue]): The list of cues in the cue list.
     """
     number: int = 1     # Cue list number
-    cue_list: List['EOSCue'] = field(default_factory=list)  # Contains cues in the cue list
+    cue_list: Dict['EOSCue'] = field(default_factory=dict)  # Contains cues in the cue list
 
 
 @dataclass
@@ -121,11 +121,11 @@ class QLabCue(Cue):
     """
     cue_label: str = ""     # Cue label
     cue_type: str = ""  # Cue type
-    cue_list: List['QLabCue'] = field(default_factory=list) # Contains child cues, if a list
+    cue_list: List['QLabCue'] = field(default_factory=list)     # Contains child cues, if a list
     parent_cue: Optional['QLabCue'] = None  # Reference to parent cue, if any
     duration: float = 0.0   # Duration of cue
-    pre_wait_time: float = 0.0  # Pre-wait time
-    post_wait_time: float = 0.0 # Post-wait time
+    pre_wait_time: float = 0.0      # Pre-wait time
+    post_wait_time: float = 0.0     # Post-wait time
 
     def __post_init__(self):
         super().__post_init__()
@@ -145,6 +145,7 @@ class CueManager:
         self.qlab_cues = {}
         self.eos_cue_lists = {}
 
+    # QLAB
     async def add_qlab_cue(self, new_cue: QLabCue, parent_cue_id: str):
         parent_cue = self.qlab_cues.get(parent_cue_id)
         if parent_cue:
@@ -177,32 +178,13 @@ class CueManager:
             if 'cues' in c and len(c['cues']) > 0:
                 await self.solve_nested_qlab_cues(qlab_cue, c['cues'])
 
-    async def populate_qlab_cues_dict(self):
-        self.qlab_cues.clear()
-        response_json = await self.query(
-            client=self.osc_handler.qlab_client,
-            dispatcher=self.osc_handler.qlab_dispatcher,
-            query='/cueLists', response='/reply/cueLists'
-        )
-        if response_json and response_json['status'] == 'ok':
-            for cue_list_data in response_json['data']:
-                root_cue = QLabCue(
-                    number=cue_list_data['number'],
-                    parent_cue=None,
-                    cue_type=cue_list_data['type'],
-                    cue_label=cue_list_data['name']
-                )
-                self.qlab_cues[root_cue.unique_id] = root_cue
-                if 'cues' in cue_list_data and cue_list_data['cues']:
-                    await self.solve_nested_qlab_cues(root_cue, cue_list_data['cues'])
-
-    async def add_extra_data(self):
+    async def add_extra_qlab_data(self):
         attribute_query_list = ["/duration", "/preWait", "/postWait", "/timecodeTrigger/text"]
         for cue_id, cue in self.qlab_cues.items():
             for attribute in attribute_query_list:
                 query_address = f"/cue_id/{cue_id}{attribute}"
                 response_address = f"/reply/cue_id/{cue_id}{attribute}"
-                response_json = await self.query(
+                address, response_json = await self.query(
                     client=self.osc_handler.qlab_client,
                     dispatcher=self.osc_handler.qlab_dispatcher,
                     query=query_address,
@@ -218,7 +200,70 @@ class CueManager:
                 elif attribute == '/timecodeTrigger/text':
                     cue.timecode = response['data']
 
-    async def query(self, client, dispatcher, query, response):
+    async def populate_qlab_cue_dict(self):
+        self.qlab_cues.clear()
+        address, response_json = await self.query(
+            client=self.osc_handler.qlab_client,
+            dispatcher=self.osc_handler.qlab_dispatcher,
+            query='/cueLists', response='/reply/cueLists'
+        )
+        if response_json and response_json['status'] == 'ok':
+            for cue_list_data in response_json['data']:
+                root_cue = QLabCue(
+                    number=cue_list_data['number'],
+                    parent_cue=None,
+                    cue_type=cue_list_data['type'],
+                    cue_label=cue_list_data['name']
+                )
+                self.qlab_cues[root_cue.unique_id] = root_cue
+                if 'cues' in cue_list_data and cue_list_data['cues']:
+                    await self.solve_nested_qlab_cues(root_cue, cue_list_data['cues'])
+            await self.add_extra_qlab_data()
+
+    # EOS
+    async def add_eos_cue(self, new_cue: EOSCue, parent_cue: EOSCueList):
+        pass
+
+    async def remove_eos_cue(self, cue: EOSCue):
+        pass
+
+    async def populate_eos_cue_dict(self):
+        self.eos_cue_lists.clear()
+        address, response = await self.query(
+            client=self.osc_handler.eos_client,
+            dispatcher=self.osc_handler.eos_dispatcher,
+            query='/eos/get/cuelist/count', response='/eos/out/get/cuelist/count'
+        )
+        cue_list_count = int(response[0])
+        for cue_list in range(cue_list_count):
+            address, cue_list_data = await self.query(
+                    client=self.osc_handler.eos_client,
+                    dispatcher=self.osc_handler.eos_dispatcher,
+                    query=f'/eos/get/cuelist/index/{cue_list}',
+                    response='/eos/out/get/cuelist/*/list/*/*'
+                )
+            components = address.split('/')
+            cue_list_number = int(components[6])
+            cue_list_obj = EOSCueList(number=cue_list_number)
+            self.eos_cue_lists[cue_list_data[1]] = cue_list_obj     # where cue_list_data[1] == cue_list_UID
+            address, response = await self.query(
+                    client=self.osc_handler.eos_client,
+                    dispatcher=self.osc_handler.eos_dispatcher,
+                    query=f'/eos/get/cue/{cue_list_number}/count',
+                    response=f'/eos/out/get/cue/{cue_list_number}/count'
+                )
+            cue_count_in_cue_list = int(response[0])
+            for cue in range(cue_count_in_cue_list):
+                address, response = await self.query(
+                    client=self.osc_handler.eos_client,
+                    dispatcher=self.osc_handler.eos_dispatcher,
+                    query=f'/eos/get/cue/{cue_list_number}/index/{cue}',
+                    response='/eos/out/get/cue/*/*/*/list/*/*'
+                )
+                components = address.split('/')
+                cue_number = components[6]
+
+    async def query(self, client, dispatcher, query, response) -> Union[List[Any, ...], None]:
         try:
             return await self.osc_handler.query_and_wait(
                 client=client,

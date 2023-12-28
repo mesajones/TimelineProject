@@ -29,7 +29,7 @@ BACKGROUND = "#2D2A2E"
 DEFAULT_FONT = Font(family="Source Code Pro", size=12)
 
 # Timecode settings
-TIMECODE_FPS = 24
+TIMECODE_FPS = 30
 
 
 def change_fps(new_fps):

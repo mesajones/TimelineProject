@@ -12,32 +12,41 @@ from config.settings import QLAB_ADDRESS, EOS_ADDRESS
 
 class OSCHandler:
     def __init__(self, loop, gui):
+        self.loop = loop
+
         self.qlab_dispatcher = Dispatcher()
         self.qlab_client = AsyncTCPClient(server_address=QLAB_ADDRESS, dispatcher=self.qlab_dispatcher)
         self.qlab_connected = False
+        self.qlab_show_name = ''
+
         self.eos_dispatcher = Dispatcher()
         self.eos_client = AsyncTCPClient(server_address=EOS_ADDRESS, dispatcher=self.eos_dispatcher)
         self.eos_connected = False
-        self.loop = loop
+        self.eos_show_name = ''
+
         self.gui = gui
 
-        asyncio.run_coroutine_threadsafe(self.run(), self.loop)
-
     async def run(self):
+        init_client_task = asyncio.create_task(self.init_client())
+        await init_client_task
+
+    async def init_client(self):
         try:
             qlab_client_task = await start_client(self.qlab_client, self.gui, QLAB_ADDRESS)
             eos_client_task = await start_client(self.eos_client, self.gui, EOS_ADDRESS)
             self.qlab_connected = await self.connect_to_qlab()
-            if self.qlab_connected is None:
+            if not self.qlab_connected:
                 raise ConnectionError("Failed to connect to QLab!")
+            self.eos_connected = await self.connect_to_eos()
+            if not self.eos_connected:
+                raise ConnectionError("Failed to connect to EOS!")
         except ConnectionError as e:
             print(e)
             raise
         except asyncio.CancelledError:
             return
 
-    @staticmethod
-    async def query_and_wait(
+    async def query_and_wait(self,
             client: AsyncTCPClient, dispatcher: Dispatcher,
             query_address: str, response_address: str, *args: Tuple[Any, ...],
             check_interval=0.1, timeout=5.0):
@@ -53,9 +62,9 @@ class OSCHandler:
         response_future = asyncio.Future()
 
         # Define a response handler
-        async def response_handler(*response_args):
+        async def response_handler(address, *response_args):
             if not response_future.done():
-                response_future.set_result(response_args)
+                response_future.set_result((address, response_args))
 
         # Set the handler for the expected response
         dispatcher.map(response_address, response_handler)
@@ -82,8 +91,9 @@ class OSCHandler:
 
     async def connect_to_qlab(self):
         if self.qlab_connected:
-            raise ConnectionError("QLab already connected")
-        response_json = await self.query_and_wait(
+            print("Already connected to QLab.")
+            return True
+        address, response_json = await self.query_and_wait(
             self.qlab_client, self.qlab_dispatcher,
             query_address="/workspaces", response_address="/reply/workspaces",
         )
@@ -92,7 +102,7 @@ class OSCHandler:
             raise ConnectionError("Error whilst connecting to QLab.")
         if response['status'] == 'ok':
             workspace_uid = response['data']['uniqueID']
-            connect_response_json = await self.query_and_wait(
+            address, connect_response_json = await self.query_and_wait(
                 self.qlab_client, self.qlab_dispatcher,
                 query_address=f"/workspace/{workspace_uid}/connect",
                 response_address=f"/reply/workspace/{workspace_uid}/connect",
@@ -102,7 +112,22 @@ class OSCHandler:
                 raise ConnectionError(f"Error whilst connecting to QLab workspace {workspace_uid}.")
             if response['status'] == 'ok' and response['data'] == 'ok':
                 return True
-        return None
+        return False
+
+    async def connect_to_eos(self):
+        if self.eos_connected:
+            print("Already connected to EOS.")
+            return True
+        address, response = await self.query_and_wait(
+            self.qlab_client, self.qlab_dispatcher,
+            query_address="/eos/reset", response_address="/eos/out/show/name",
+        )
+        if response is None:
+            raise ConnectionError(f"Error whilst connecting to EOS.")
+        if isinstance(response[0], str):
+            self.eos_show_name = response[0]
+            self.eos_connected = True
+        return False
 
 
 async def start_client(
