@@ -1,4 +1,6 @@
 import re
+import json
+from typing import Union, Dict, Any, List, Tuple
 
 
 def validate_ip(ip: str) -> bool:
@@ -7,12 +9,12 @@ def validate_ip(ip: str) -> bool:
     return ip_regex.match(ip) is not None
 
 
-def timecode_to_float(timecode, fps):
+def timecode_to_float(timecode: str, fps: int) -> float:
     hh, mm, ss, ff = map(int, timecode.split(':'))
     return hh * 3600 + mm * 60 + ss + ff / fps
 
 
-def float_to_timecode(seconds, fps):
+def float_to_timecode(seconds: float, fps: float) -> str:
     hh = int(seconds // 3600)
     seconds %= 3600
     mm = int(seconds // 60)
@@ -22,3 +24,10 @@ def float_to_timecode(seconds, fps):
 
     return f"{hh:02}:{mm:02}:{ss:02}:{ff:02}"
 
+
+def parse_json(json_string: str) -> Union[Dict[str, Any], None]:
+    try:
+        response = json.loads(json_string)
+        return response
+    except json.JSONDecodeError:
+        return None
