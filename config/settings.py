@@ -1,6 +1,6 @@
 import configparser
 import os
-from tkinter.font import Font
+
 
 # Network settings
 DEFAULT_NETWORK = "127.0.0.1", 53000, "127.0.0.1", 54000
@@ -26,7 +26,13 @@ EOS_ADDRESS = config.get('NETWORK', 'EOS_IP'), int(config.get('NETWORK', 'EOS_PO
 # GUI defaults
 FOREGROUND = "#FCFCFA"
 BACKGROUND = "#2D2A2E"
-DEFAULT_FONT = Font(family="Source Code Pro", size=12)
+HALF_ACCENT = "#38353A"
+ACCENT = "#454147"
+DEFAULT_FONT = "Spot Mono"
+
+GREEN = "#A9DC76"
+BLUE = "#78DCE8"
+ORANGE = "#FF6188"
 
 # Timecode settings
 TIMECODE_FPS = 30
