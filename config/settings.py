@@ -24,7 +24,7 @@ QLAB_ADDRESS = config.get('NETWORK', 'QLAB_IP'), int(config.get('NETWORK', 'QLAB
 EOS_ADDRESS = config.get('NETWORK', 'EOS_IP'), int(config.get('NETWORK', 'EOS_PORT'))
 
 # GUI defaults
-FOREGROUND = "#FCFCFA"
+FOREGROUND = "#D9D9D7"
 BACKGROUND = "#2D2A2E"
 HALF_ACCENT = "#38353A"
 ACCENT = "#454147"

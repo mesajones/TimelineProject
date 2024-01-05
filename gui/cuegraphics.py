@@ -1,25 +1,9 @@
-import sys
-from PyQt6.QtWidgets import QApplication, QGraphicsScene, QGraphicsView, QGraphicsItem, QMainWindow
-from PyQt6.QtGui import QPen, QBrush, QColor, QFont
-from PyQt6.QtCore import Qt, QRectF, QSizeF
+from PyQt6.QtCore import QRectF, QSizeF
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QGraphicsItem
 
-from config.settings import DEFAULT_FONT, FOREGROUND, BACKGROUND, ACCENT, HALF_ACCENT, GREEN,  BLUE, ORANGE
-
-
-foreground_brush = QBrush(QColor(FOREGROUND))
-background_brush = QBrush(QColor(BACKGROUND))
-background_brush_translucent = QBrush(QColor(BACKGROUND))
-accent_brush = QBrush(QColor(ACCENT))
-half_accent_brush = QBrush(QColor(HALF_ACCENT))
-
-foreground_pen = QPen(QColor(FOREGROUND))
-background_pen = QPen(QColor(BACKGROUND))
-accent_pen = QPen(QColor(ACCENT))
-half_accent_pen = QPen(QColor(HALF_ACCENT))
-
-green_pen = QPen(QColor(GREEN))
-blue_pen = QPen(QColor(BLUE))
-orange_pen = QPen(QColor(ORANGE))
+from config.settings import DEFAULT_FONT
+from gui.brushpen import accent_pen, background_brush, half_accent_brush, foreground_pen, background_pen, accent_brush
 
 
 class BaseCueGraphic(QGraphicsItem):
@@ -44,6 +28,10 @@ class BaseCueGraphic(QGraphicsItem):
 
     def boundingRect(self):
         return self.rect.adjusted(-self.handleSize, -self.handleSize, self.handleSize, self.handleSize)
+
+    def adjustForZoom(self, zoom_change):
+        self.rect.setWidth(self.rect.width() * zoom_change)
+        self.update()  # Redraw the item
 
     def paint(self, painter, option, widget=None):
         if self.isSelected():
@@ -120,41 +108,9 @@ class BaseCueGraphic(QGraphicsItem):
         self.update()
 
 
-class TimelineScene(QGraphicsScene):
+class EOSCueGraphic(BaseCueGraphic):
     pass
 
 
-class TimelineView(QGraphicsView):
+class QLabCueGraphic(BaseCueGraphic):
     pass
-
-
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-
-        # Create a QGraphicsScene
-        self.scene = QGraphicsScene()
-        self.resize(800, 600)
-
-        cue_graphic = BaseCueGraphic()
-
-        # Create items
-        self.scene.addItem(cue_graphic)
-
-        # Create a QGraphicsView
-        self.view = QGraphicsView(self.scene, self)
-        self.setCentralWidget(self.view)
-
-        # Window Title
-        self.setWindowTitle("")
-
-
-# Application Instance
-app = QApplication(sys.argv)
-
-# Create and Show Main Window
-window = MainWindow()
-window.show()
-
-# Run the application
-sys.exit(app.exec())

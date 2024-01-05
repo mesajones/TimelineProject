@@ -39,7 +39,7 @@ class Cue:
         if isinstance(self.timecode, str):
             # If it is, convert it to a float using the timecode_to_float function.
             if len(self.timecode) == 11:
-                self.timecode = timecode_to_float(self.timecode, TIMECODE_FPS)
+                self.timecode = timecode_to_float(self.timecode)
             else:
                 self.timecode = None
 
@@ -47,7 +47,7 @@ class Cue:
     def timecode_str(self):
         """Property to get the timecode in hh:mm:ss:ff format"""
         if self.timecode:
-            return float_to_timecode(self.timecode, TIMECODE_FPS)
+            return float_to_timecode(self.timecode)
         else:
             return None
 
